@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk Sorter</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1b;--mute:#6b6a65;--line:#dedcd6;--sel:#2f6fed;--chip:#eceae4}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#20201e;--ink:#ecebe7;--mute:#9a9891;--line:#33322f;--sel:#5b8cff;--chip:#2c2b28}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+h1{font-size:16px;margin:0 12px 0 0}
+input,select,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+button{cursor:pointer}
+#buckets{margin-top:8px}
+.bk{display:inline-flex;gap:6px;align-items:center}
+.bk kbd{font:11px ui-monospace,monospace;color:var(--mute)}
+.bk b{font-weight:600}
+.bk span{color:var(--mute);font-size:12px}
+#status{color:var(--mute);font-size:12px;margin-left:auto}
+.help{color:var(--mute);font-size:12px;margin-top:6px}
+main{padding:8px 16px 80px}
+.folder{margin:18px 0 6px;display:flex;gap:10px;align-items:baseline;font-weight:600}
+.folder small{color:var(--mute);font-weight:400}
+.folder a{font-weight:400;font-size:12px;color:var(--sel);cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.t{background:var(--card);border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;user-select:none;position:relative}
+.t.sel{border-color:var(--sel)}
+.t .im{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--chip);color:var(--mute);font-size:12px;text-align:center;padding:4px}
+.t img{width:100%;height:100%;object-fit:contain}
+.t .nm{font-size:11px;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute)}
+.t .ch{position:absolute;top:4px;left:4px;background:var(--sel);color:#fff;font-size:11px;border-radius:4px;padding:1px 5px;max-width:90%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.t .vd{position:absolute;top:4px;right:4px;background:#000a;color:#fff;font-size:10px;border-radius:4px;padding:1px 4px}
+#ov{position:fixed;inset:0;background:#000d;display:none;z-index:10;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+#ov.on{display:flex}
+#ov .media{max-width:100%;max-height:78vh;display:flex}
+#ov img,#ov video{max-width:100%;max-height:78vh;object-fit:contain}
+#ov .meta{color:#ddd;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;max-width:100%}
+#ov input{min-width:260px}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>Desk Sorter</h1>
+    <span id="count"></span>
+    <input id="q" placeholder="Filter by name or folder" size="24">
+    <select id="show"></select>
+    <select id="kind"><option value="">Images and videos</option><option value="image">Images</option><option value="video">Videos</option></select>
+    <button id="addb">+ bucket</button>
+    <span id="status">loading…</span>
+  </div>
+  <div class="row" id="buckets"></div>
+  <div class="help">Click to select (Shift-click for a range, "select folder" for all of a folder). Press 1–9, 0 or click a bucket to sort the selection; X clears it. N gives the selection a name or topic. Space or double-click opens a preview (arrows move, Esc closes). Everything saves by itself.</div>
+</header>
+<main id="main"></main>
+<div id="ov"><div class="media" id="media"></div><div class="meta"><span id="minfo"></span><input id="mname" placeholder="Name or topic for this file"></div></div>
+<script>
+const DEFAULT_BUCKETS=["Work","Personal","Content","Screenshots","Keep","Delete?","Not sure"];
+let items=[],byId={},choices={},buckets=[],visible=[],sel=new Set(),anchor=null,cur=null,saveT=null;
+const $=s=>document.querySelector(s);
+const fmt=b=>b>1e9?(b/1e9).toFixed(1)+" GB":b>1e6?(b/1e6).toFixed(1)+" MB":Math.round(b/1e3)+" KB";
+async function load(){
+  const d=await (await fetch("/data")).json();
+  items=d.items; items.forEach(i=>byId[i.id]=i);
+  choices=d.choices||{}; buckets=choices._buckets||DEFAULT_BUCKETS.slice(); delete choices._buckets;
+  document.title="Desk Sorter: "+d.sheet;
+  drawBuckets(); render(); $("#status").textContent="sheet "+d.sheet+", made "+d.made;
+}
+function drawBuckets(){
+  const s=$("#show"), v=s.value;
+  s.innerHTML='<option value="">Show all</option><option value="__none">Unsorted only</option>'+buckets.map(b=>`<option>${esc(b)}</option>`).join("");
+  s.value=v;
+  const n={}; Object.values(choices).forEach(c=>{if(c.b)n[c.b]=(n[c.b]||0)+1});
+  $("#buckets").innerHTML=buckets.map((b,i)=>`<button class="bk" data-b="${esc(b)}">${i<10?`<kbd>${(i+1)%10}</kbd>`:""}<b>${esc(b)}</b><span>${n[b]||0}</span></button>`).join("");
+  const sorted=Object.values(choices).filter(c=>c.b).length;
+  $("#count").textContent=`${items.length} files, ${sorted} sorted`;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function render(){
+  const q=$("#q").value.toLowerCase(), show=$("#show").value, kind=$("#kind").value;
+  visible=items.filter(i=>{
+    const c=choices[i.id]||{};
+    if(kind&&i.kind!==kind)return false;
+    if(show==="__none"&&c.b)return false;
+    if(show&&show!=="__none"&&c.b!==show)return false;
+    if(q&&!(i.name+" "+i.folder+" "+(c.n||"")).toLowerCase().includes(q))return false;
+    return true;});
+  const groups=new Map(); visible.forEach(i=>{if(!groups.has(i.folder))groups.set(i.folder,[]);groups.get(i.folder).push(i)});
+  let h="";
+  for(const [f,list] of groups){
+    h+=`<div class="folder">${esc(f)} <small>${list.length}</small><a data-f="${esc(f)}">select folder</a></div><div class="grid">`;
+    for(const i of list)h+=tile(i);
+    h+="</div>";
+  }
+  $("#main").innerHTML=h||"<p>Nothing to show.</p>";
+}
+function tile(i){
+  const c=choices[i.id]||{};
+  const im=i.thumb?`<img loading="lazy" src="/thumb/${i.id}" alt="">`:`<span>${i.icloud_only?"only in iCloud":"no preview"}<br>${esc(i.name.split(".").pop())}</span>`;
+  return `<div class="t${sel.has(i.id)?" sel":""}" data-id="${i.id}" title="${esc(i.name)}\n${fmt(i.size)}, ${new Date(i.mtime*1000).toISOString().slice(0,10)}">`+
+    `<div class="im">${im}</div>${c.b?`<div class="ch">${esc(c.b)}</div>`:""}${i.kind==="video"?`<div class="vd">video</div>`:""}`+
+    `<div class="nm">${esc(c.n||i.name)}</div></div>`;
+}
+function refresh(ids){ids.forEach(id=>{const el=document.querySelector(`.t[data-id="${id}"]`); if(el)el.outerHTML=tile(byId[id]);}); drawBuckets();}
+function assign(b){
+  const ids=cur?[cur]:[...sel]; if(!ids.length)return;
+  ids.forEach(id=>{choices[id]=Object.assign(choices[id]||{}, {b}); if(!b)delete choices[id].b;});
+  refresh(ids); save();
+  if(!cur){sel.clear(); refresh(ids);}
+}
+function save(){
+  $("#status").textContent="saving…"; clearTimeout(saveT);
+  saveT=setTimeout(async()=>{
+    try{const r=await fetch("/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...choices,_buckets:buckets})});
+      $("#status").textContent=r.ok?"saved "+new Date().toLocaleTimeString():"NOT saved";}
+    catch(e){$("#status").textContent="NOT saved (is the server running?)";}
+  },400);
+}
+$("#main").addEventListener("click",e=>{
+  const a=e.target.closest("a[data-f]");
+  if(a){const f=a.dataset.f; const ids=visible.filter(i=>i.folder===f).map(i=>i.id); const all=ids.every(id=>sel.has(id)); ids.forEach(id=>all?sel.delete(id):sel.add(id)); refresh(ids); return;}
+  const t=e.target.closest(".t"); if(!t)return; const id=t.dataset.id;
+  if(e.shiftKey&&anchor){const ids=visible.map(i=>i.id); let a1=ids.indexOf(anchor),b1=ids.indexOf(id); if(a1>b1)[a1,b1]=[b1,a1]; const r=ids.slice(a1,b1+1); r.forEach(x=>sel.add(x)); refresh(r);}
+  else{sel.has(id)?sel.delete(id):sel.add(id); anchor=id; refresh([id]);}
+});
+$("#main").addEventListener("dblclick",e=>{const t=e.target.closest(".t"); if(t)openPreview(t.dataset.id);});
+$("#buckets").addEventListener("click",e=>{const b=e.target.closest(".bk"); if(b)assign(b.dataset.b);});
+$("#addb").onclick=()=>{const n=prompt("New bucket name"); if(n&&!buckets.includes(n.trim())){buckets.push(n.trim()); drawBuckets(); save();}};
+["#q","#show","#kind"].forEach(s=>$(s).addEventListener("input",render));
+function openPreview(id){
+  cur=id; const i=byId[id], c=choices[id]||{};
+  $("#media").innerHTML=i.kind==="video"?`<video src="/file/${id}" controls autoplay preload="metadata"></video>`:`<img src="/file/${id}" alt="">`;
+  $("#minfo").textContent=`${i.folder}/${i.name} · ${fmt(i.size)} · ${new Date(i.mtime*1000).toISOString().slice(0,10)}${c.b?" · "+c.b:""}`;
+  $("#mname").value=c.n||""; $("#ov").classList.add("on");
+}
+function closePreview(){cur=null; $("#media").innerHTML=""; $("#ov").classList.remove("on");}
+$("#mname").addEventListener("input",e=>{choices[cur]=Object.assign(choices[cur]||{},{n:e.target.value}); refresh([cur]); save();});
+$("#ov").addEventListener("click",e=>{if(e.target.id==="ov")closePreview();});
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"){if(e.key==="Escape")e.target.blur(); return;}
+  if(e.key==="Escape"){if(cur)closePreview(); else{const ids=[...sel]; sel.clear(); refresh(ids);} return;}
+  if(/^[0-9]$/.test(e.key)){const k=e.key==="0"?9:+e.key-1; if(buckets[k]){assign(buckets[k]); if(cur)openPreview(cur);} e.preventDefault(); return;}
+  if(e.key==="x"||e.key==="X"){assign(null); return;}
+  if((e.key==="n"||e.key==="N")&&!cur&&sel.size){const v=prompt(`Name or topic for ${sel.size} files`); if(v!==null){const ids=[...sel]; ids.forEach(id=>choices[id]=Object.assign(choices[id]||{},{n:v})); refresh(ids); save();} return;}
+  if(e.key===" "){e.preventDefault(); if(cur)return closePreview(); const id=anchor||[...sel][0]||(visible[0]&&visible[0].id); if(id)openPreview(id); return;}
+  if(cur&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){const ids=visible.map(i=>i.id); const n=ids.indexOf(cur)+(e.key==="ArrowRight"?1:-1); if(ids[n])openPreview(ids[n]);}
+});
+load();
+</script>
+</body>
+</html>
