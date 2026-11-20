@@ -28,7 +28,7 @@ Ask for their buckets: brands, projects, clients, "Personal", "Delete?", "Not su
 python3 make_sheet.py <sheet> <folder> [<folder> ...] [--skip <folder>] --buckets "A,B,Delete?,Not sure"
 ```
 
-`<sheet>` is a short name such as `downloads`. This writes `data/<sheet>/` (the list and 320 px thumbnails) and moves nothing. Report what it prints: images, videos, and how many live only in iCloud. Those get no thumbnail, because making one would download them. If Desktop and Documents sync to iCloud, a later delete there syncs to every device too: say so.
+`<sheet>` is a short name such as `downloads`. This writes `data/<sheet>/` (the list and 320 px thumbnails) and moves nothing. Report what it prints: images, videos, and how many live only in iCloud. Those get no thumbnail, because making one would download them. To see them, she Control-clicks the folder in Finder and chooses Keep Downloaded (it downloads everything inside: give the folder's size and the free disk space first), then you run `make_sheet.py` again. If Desktop and Documents sync to iCloud, a later delete there syncs to every device too: say so.
 
 ## 3. Open the page
 
