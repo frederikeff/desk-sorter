@@ -45,16 +45,20 @@ python3 apply.py downloads --go
 python3 apply.py downloads --undo moves-<time>.tsv
 ```
 
+Add `--all` to step 1 to take documents too (PDFs, notes, Word files and the rest). PDFs, notes and Word files get a Quick Look thumbnail, and a folder that holds a `.git` folder is left out and named, because a copy of code is checked as a whole, not sorted file by file.
+
 ### On the page
 
 | Key | What it does |
 |---|---|
 | Click, Shift-click | Select, select a range |
 | "select folder" | Select all of a folder |
+| "+ subfolders" | Select a folder and everything below it |
+| ⌘A (Ctrl-A) | Select everything shown: type a word in the filter first, then ⌘A |
 | 1–9, 0 | Put the selection in that bucket |
 | X | Take the selection out of its bucket |
 | N | Name the selection (becomes a subfolder when moving) |
-| Space, double-click | Full preview; arrows move, Esc closes |
+| Space, double-click | Full preview (PDFs and text files too); arrows move, Esc closes |
 | "+ bucket" | Add a bucket |
 
 It saves as you go. Close the page, stop the server, come back tomorrow: your choices are still there.
@@ -86,7 +90,7 @@ A folder path means "move there". `""` means "leave them where they are". `"TRAS
 
 - **iCloud:** files that live only in iCloud ("Optimize Mac Storage") show "only in iCloud" instead of a thumbnail, because making one would download them. To see them, Control-click the folder in Finder and choose **Keep Downloaded** (it downloads everything inside, so check the folder's size and your free space first), then run `make_sheet.py` again. Moving files on the same disk is a rename, so files only in iCloud can be moved without downloading them. If your Desktop and Documents sync to iCloud, whatever you move or trash there changes on your other devices too. The `trash` command can refuse files in iCloud Drive; `apply.py --go` then says how many stayed where they are, and you drag those to the Trash in Finder.
 - **Big folders:** making the sheet for 4,784 files took under two minutes on my Mac. Thumbnails are reused when you run it again.
-- **Only images and videos.** PDFs, zips and installers are a job for another day.
+- **Documents** come in with `--all`. A text or HTML file is shown as plain text, so nothing in it runs on the page. Zips, installers and Word files show their thumbnail only.
 
 ## License
 

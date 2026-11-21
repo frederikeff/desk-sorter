@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Make a sort sheet: thumbnails and a list of every image and video under the given folders.
 
-  python3 make_sheet.py <sheet-name> <folder> [<folder> ...] [--skip <folder> ...] [--buckets "Work,Personal,Delete?"]
+  python3 make_sheet.py <sheet-name> <folder> [<folder> ...] [--skip <folder> ...] [--buckets "Work,Personal,Delete?"] [--all]
 
 Writes data/<sheet-name>/items.json and data/<sheet-name>/thumbs/. Reads only; moves nothing.
 Files that live only in iCloud get no thumbnail (making one would download them).
 --buckets sets the first buckets of a new sheet (the page can add more later).
+--all takes every file, documents too (PDFs, notes, Word files and the rest), not only images and videos.
+    Then folders that hold a .git folder are left out and named: a copy of code is checked as a whole, not sorted file by file.
 """
 import hashlib, json, os, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +23,8 @@ def main():
         sys.exit(__doc__)
     name, rest = args[0], args[1:]
     roots, skip, buckets = [], [], None
+    every = "--all" in rest
+    rest = [a for a in rest if a != "--all"]
     i = 0
     while i < len(rest):
         if rest[i] in ("--skip", "--buckets") and i + 1 < len(rest):
@@ -44,15 +48,19 @@ def main():
         with open(choices, "w", encoding="utf-8") as fh:
             json.dump({"_buckets": buckets}, fh, ensure_ascii=False)
 
-    items = []
+    items, code = [], []
     for root in roots:
         for r, ds, fs in os.walk(root):
+            if every and ".git" in ds and r != root:
+                code.append(r)
+                ds[:] = []
+                continue
             ds[:] = sorted(d for d in ds if not d.startswith(".") and not d.endswith((".app", ".photoslibrary"))
                            and os.path.join(r, d) not in skip and d != "node_modules")
             for f in sorted(fs):
                 low = f.lower()
-                kind = "image" if low.endswith(IMG) else "video" if low.endswith(VID) else None
-                if not kind:
+                kind = "image" if low.endswith(IMG) else "video" if low.endswith(VID) else "document" if every else None
+                if not kind or f.startswith(".") or f == "Icon\r":
                     continue
                 p = os.path.join(r, f)
                 st = os.stat(p)
@@ -93,10 +101,13 @@ def main():
         it["thumb"] = os.path.exists(os.path.join(thumbs, it["id"] + ".jpg"))
     with open(os.path.join(out, "items.json"), "w", encoding="utf-8") as fh:
         json.dump({"sheet": name, "made": time.strftime("%Y-%m-%d %H:%M"), "roots": roots, "items": items}, fh)
-    n_img = sum(i["kind"] == "image" for i in items)
-    print(f"{name}: {n_img} images, {len(items) - n_img} videos, "
+    n = {k: sum(i["kind"] == k for i in items) for k in ("image", "video", "document")}
+    docs = f", {n['document']} documents" if every else ""
+    print(f"{name}: {n['image']} images, {n['video']} videos{docs}, "
           f"{sum(i['thumb'] for i in items)} thumbnails, {sum(i['icloud_only'] for i in items)} only in iCloud, "
           f"{time.time() - t0:.0f}s")
+    for c in code:
+        print(f"Left out, a copy of code (has .git): {c}")
 
 
 if __name__ == "__main__":

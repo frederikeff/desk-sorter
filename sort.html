@@ -39,6 +39,9 @@ main{padding:8px 16px 80px}
 #ov img,#ov video{max-width:100%;max-height:78vh;object-fit:contain}
 #ov .meta{color:#ddd;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;max-width:100%}
 #ov input{min-width:260px}
+#ov iframe.doc{width:min(900px,92vw);height:78vh;border:0;background:#fff;border-radius:6px}
+#ov pre.doc{width:min(900px,92vw);max-height:78vh;overflow:auto;margin:0;background:var(--card);color:var(--ink);padding:12px;border-radius:6px;white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,monospace}
+#ov .none{color:#ddd;text-align:center}
 </style>
 </head>
 <body>
@@ -48,12 +51,12 @@ main{padding:8px 16px 80px}
     <span id="count"></span>
     <input id="q" placeholder="Filter by name or folder" size="24">
     <select id="show"></select>
-    <select id="kind"><option value="">Images and videos</option><option value="image">Images</option><option value="video">Videos</option></select>
+    <select id="kind"><option value="">All kinds</option><option value="image">Images</option><option value="video">Videos</option><option value="document">Documents</option></select>
     <button id="addb">+ bucket</button>
     <span id="status">loading…</span>
   </div>
   <div class="row" id="buckets"></div>
-  <div class="help">Click to select (Shift-click for a range, "select folder" for all of a folder). Press 1–9, 0 or click a bucket to sort the selection; X clears it. N gives the selection a name or topic. Space or double-click opens a preview (arrows move, Esc closes). Everything saves by itself.</div>
+  <div class="help">Click to select (Shift-click for a range, "select folder" for all of a folder, "+ subfolders" for everything below it, ⌘A or Ctrl-A for everything shown: filter first, e.g. by a word in the name). Press 1–9, 0 or click a bucket to sort the selection; X clears it. N gives the selection a name or topic. Space or double-click opens a preview (arrows move, Esc closes). Everything saves by itself.</div>
 </header>
 <main id="main"></main>
 <div id="ov"><div class="media" id="media"></div><div class="meta"><span id="minfo"></span><input id="mname" placeholder="Name or topic for this file"></div></div>
@@ -61,6 +64,8 @@ main{padding:8px 16px 80px}
 const DEFAULT_BUCKETS=["Work","Personal","Content","Screenshots","Keep","Delete?","Not sure"];
 let items=[],byId={},choices={},buckets=[],visible=[],sel=new Set(),anchor=null,cur=null,saveT=null;
 const $=s=>document.querySelector(s);
+const TEXT=["txt","md","csv","tsv","json","html","htm","css","js","ts","tsx","jsx","py","sql","xml","yml","yaml","log","webmanifest"];
+const ext=i=>i.name.includes(".")?i.name.split(".").pop().toLowerCase():"file";
 const fmt=b=>b>1e9?(b/1e9).toFixed(1)+" GB":b>1e6?(b/1e6).toFixed(1)+" MB":Math.round(b/1e3)+" KB";
 async function load(){
   const d=await (await fetch("/data")).json();
@@ -91,7 +96,7 @@ function render(){
   const groups=new Map(); visible.forEach(i=>{if(!groups.has(i.folder))groups.set(i.folder,[]);groups.get(i.folder).push(i)});
   let h="";
   for(const [f,list] of groups){
-    h+=`<div class="folder">${esc(f)} <small>${list.length}</small><a data-f="${esc(f)}">select folder</a></div><div class="grid">`;
+    h+=`<div class="folder">${esc(f)} <small>${list.length}</small><a data-f="${esc(f)}">select folder</a><a data-f="${esc(f)}" data-sub="1">+ subfolders</a></div><div class="grid">`;
     for(const i of list)h+=tile(i);
     h+="</div>";
   }
@@ -101,9 +106,10 @@ function tile(i){
   const c=choices[i.id]||{};
   const im=i.thumb?`<img loading="lazy" src="/thumb/${i.id}" alt="">`:`<span>${i.icloud_only?"only in iCloud":"no preview"}<br>${esc(i.name.split(".").pop())}</span>`;
   return `<div class="t${sel.has(i.id)?" sel":""}" data-id="${i.id}" title="${esc(i.name)}\n${fmt(i.size)}, ${new Date(i.mtime*1000).toISOString().slice(0,10)}">`+
-    `<div class="im">${im}</div>${c.b?`<div class="ch">${esc(c.b)}</div>`:""}${i.kind==="video"?`<div class="vd">video</div>`:""}`+
+    `<div class="im">${im}</div>${c.b?`<div class="ch">${esc(c.b)}</div>`:""}${i.kind==="video"?`<div class="vd">video</div>`:i.kind==="document"?`<div class="vd">${esc(ext(i))}</div>`:""}`+
     `<div class="nm">${esc(c.n||i.name)}</div></div>`;
 }
+function mark(ids){ids.forEach(id=>{const el=document.querySelector(`.t[data-id="${id}"]`); if(el)el.classList.toggle("sel",sel.has(id));});}  // selection only: tiles stay, so double-click works
 function refresh(ids){ids.forEach(id=>{const el=document.querySelector(`.t[data-id="${id}"]`); if(el)el.outerHTML=tile(byId[id]);}); drawBuckets();}
 function assign(b){
   const ids=cur?[cur]:[...sel]; if(!ids.length)return;
@@ -121,10 +127,10 @@ function save(){
 }
 $("#main").addEventListener("click",e=>{
   const a=e.target.closest("a[data-f]");
-  if(a){const f=a.dataset.f; const ids=visible.filter(i=>i.folder===f).map(i=>i.id); const all=ids.every(id=>sel.has(id)); ids.forEach(id=>all?sel.delete(id):sel.add(id)); refresh(ids); return;}
+  if(a){const f=a.dataset.f, sub=a.dataset.sub; const ids=visible.filter(i=>i.folder===f||(sub&&i.folder.startsWith(f+"/"))).map(i=>i.id); const all=ids.every(id=>sel.has(id)); ids.forEach(id=>all?sel.delete(id):sel.add(id)); mark(ids); return;}
   const t=e.target.closest(".t"); if(!t)return; const id=t.dataset.id;
-  if(e.shiftKey&&anchor){const ids=visible.map(i=>i.id); let a1=ids.indexOf(anchor),b1=ids.indexOf(id); if(a1>b1)[a1,b1]=[b1,a1]; const r=ids.slice(a1,b1+1); r.forEach(x=>sel.add(x)); refresh(r);}
-  else{sel.has(id)?sel.delete(id):sel.add(id); anchor=id; refresh([id]);}
+  if(e.shiftKey&&anchor){const ids=visible.map(i=>i.id); let a1=ids.indexOf(anchor),b1=ids.indexOf(id); if(a1>b1)[a1,b1]=[b1,a1]; const r=ids.slice(a1,b1+1); r.forEach(x=>sel.add(x)); mark(r);}
+  else{sel.has(id)?sel.delete(id):sel.add(id); anchor=id; mark([id]);}
 });
 $("#main").addEventListener("dblclick",e=>{const t=e.target.closest(".t"); if(t)openPreview(t.dataset.id);});
 $("#buckets").addEventListener("click",e=>{const b=e.target.closest(".bk"); if(b)assign(b.dataset.b);});
@@ -132,7 +138,13 @@ $("#addb").onclick=()=>{const n=prompt("New bucket name"); if(n&&!buckets.includ
 ["#q","#show","#kind"].forEach(s=>$(s).addEventListener("input",render));
 function openPreview(id){
   cur=id; const i=byId[id], c=choices[id]||{};
-  $("#media").innerHTML=i.kind==="video"?`<video src="/file/${id}" controls autoplay preload="metadata"></video>`:`<img src="/file/${id}" alt="">`;
+  const x=ext(i);
+  $("#media").innerHTML=i.kind==="video"?`<video src="/file/${id}" controls autoplay preload="metadata"></video>`
+    :i.kind==="image"?`<img src="/file/${id}" alt="">`
+    :x==="pdf"?`<iframe class="doc" src="/file/${id}"></iframe>`
+    :TEXT.includes(x)?`<pre class="doc">loading…</pre>`
+    :i.thumb?`<img src="/thumb/${id}" alt="">`:`<div class="none">No preview for .${esc(x)} files</div>`;
+  if(i.kind==="document"&&TEXT.includes(x))fetch(`/file/${id}`,{headers:{Range:"bytes=0-199999"}}).then(r=>r.text()).then(t=>{const pre=$("#media pre"); if(cur===id&&pre)pre.textContent=t;});
   $("#minfo").textContent=`${i.folder}/${i.name} · ${fmt(i.size)} · ${new Date(i.mtime*1000).toISOString().slice(0,10)}${c.b?" · "+c.b:""}`;
   $("#mname").value=c.n||""; $("#ov").classList.add("on");
 }
@@ -141,8 +153,9 @@ $("#mname").addEventListener("input",e=>{choices[cur]=Object.assign(choices[cur]
 $("#ov").addEventListener("click",e=>{if(e.target.id==="ov")closePreview();});
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"){if(e.key==="Escape")e.target.blur(); return;}
-  if(e.key==="Escape"){if(cur)closePreview(); else{const ids=[...sel]; sel.clear(); refresh(ids);} return;}
+  if(e.key==="Escape"){if(cur)closePreview(); else{const ids=[...sel]; sel.clear(); mark(ids);} return;}
   if(/^[0-9]$/.test(e.key)){const k=e.key==="0"?9:+e.key-1; if(buckets[k]){assign(buckets[k]); if(cur)openPreview(cur);} e.preventDefault(); return;}
+  if((e.metaKey||e.ctrlKey)&&(e.key==="a"||e.key==="A")){e.preventDefault(); if(cur)return; const ids=visible.map(i=>i.id); ids.forEach(id=>sel.add(id)); mark(ids); return;}
   if(e.key==="x"||e.key==="X"){assign(null); return;}
   if((e.key==="n"||e.key==="N")&&!cur&&sel.size){const v=prompt(`Name or topic for ${sel.size} files`); if(v!==null){const ids=[...sel]; ids.forEach(id=>choices[id]=Object.assign(choices[id]||{},{n:v})); refresh(ids); save();} return;}
   if(e.key===" "){e.preventDefault(); if(cur)return closePreview(); const id=anchor||[...sel][0]||(visible[0]&&visible[0].id); if(id)openPreview(id); return;}

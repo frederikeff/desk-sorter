@@ -25,10 +25,12 @@ Ask for their buckets: brands, projects, clients, "Personal", "Delete?", "Not su
 ## 2. Make the sheet (reads only)
 
 ```
-python3 make_sheet.py <sheet> <folder> [<folder> ...] [--skip <folder>] --buckets "A,B,Delete?,Not sure"
+python3 make_sheet.py <sheet> <folder> [<folder> ...] [--skip <folder>] --buckets "A,B,Delete?,Not sure" [--all]
 ```
 
-`<sheet>` is a short name such as `downloads`. This writes `data/<sheet>/` (the list and 320 px thumbnails) and moves nothing. Report what it prints: images, videos, and how many live only in iCloud. Those get no thumbnail, because making one would download them. To see them, she Control-clicks the folder in Finder and chooses Keep Downloaded (it downloads everything inside: give the folder's size and the free disk space first), then you run `make_sheet.py` again. If Desktop and Documents sync to iCloud, a later delete there syncs to every device too: say so.
+`<sheet>` is a short name such as `downloads`. This writes `data/<sheet>/` (the list and 320 px thumbnails) and moves nothing. Report what it prints: images, videos, and how many live only in iCloud. Those get no thumbnail, because making one would download them. To see them, they Control-click the folder in Finder and choose Keep Downloaded (it downloads everything inside: give the folder's size and the free disk space first), then you run `make_sheet.py` again. If Desktop and Documents sync to iCloud, a later delete there syncs to every device too: say so.
+
+`--all` takes documents too (PDFs, notes, Word files and the rest). Use it when they want to sort those as well. It leaves out folders that hold a `.git` folder and names them: say that a copy of code is better checked against its repository as a whole.
 
 ## 3. Open the page
 
@@ -38,7 +40,7 @@ Pick a free port (check that `lsof -ti tcp:8791` prints nothing), then start the
 python3 server.py <sheet> 8791
 ```
 
-Give them http://127.0.0.1:8791 and the keys: click to select, Shift-click for a range, "select folder" for a whole folder, 1–9 and 0 to put the selection in a bucket, X to clear, N to give the selection a name or topic (it becomes a subfolder later), Space for a full preview. It saves by itself, so they can stop and come back.
+Give them http://127.0.0.1:8791 and the keys: click to select, Shift-click for a range, "select folder" for a whole folder, "+ subfolders" for a folder and everything below it, ⌘A for everything shown (filter by a word first), 1–9 and 0 to put the selection in a bucket, X to clear, N to give the selection a name or topic (it becomes a subfolder later), Space for a full preview. It saves by itself, so they can stop and come back.
 
 Then wait. They may sort for hours. Don't ask whether they are done.
 

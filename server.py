@@ -16,7 +16,11 @@ ITEMS = json.load(open(os.path.join(DATA, "items.json"), encoding="utf-8"))
 BY_ID = {i["id"]: i for i in ITEMS["items"]}
 CHOICES = os.path.join(DATA, "choices.json")
 TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
-         ".svg": "image/svg+xml", ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm"}
+         ".svg": "image/svg+xml", ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+         ".pdf": "application/pdf"}
+# Shown as plain text in the preview, HTML too, so nothing in a file can run on the sort page.
+TEXT = (".txt", ".md", ".csv", ".tsv", ".json", ".html", ".htm", ".css", ".js", ".ts", ".tsx", ".jsx", ".py", ".sql",
+        ".xml", ".yml", ".yaml", ".log", ".webmanifest")
 
 
 class H(BaseHTTPRequestHandler):
@@ -45,7 +49,9 @@ class H(BaseHTTPRequestHandler):
         if m.group(1) == "thumb":
             f = os.path.join(DATA, "thumbs", it["id"] + ".jpg")
             return self.send(200, open(f, "rb").read(), "image/jpeg") if os.path.exists(f) else self.send(404, b"{}")
-        return self.file(it["path"], TYPES.get(os.path.splitext(it["path"])[1].lower(), "application/octet-stream"))
+        ext = os.path.splitext(it["path"])[1].lower()
+        ctype = "text/plain; charset=utf-8" if ext in TEXT else TYPES.get(ext, "application/octet-stream")
+        return self.file(it["path"], ctype)
 
     def file(self, path, ctype):  # with Range, so videos can be scrubbed
         size = os.path.getsize(path)
@@ -57,6 +63,7 @@ class H(BaseHTTPRequestHandler):
         length = end - start + 1
         self.send_response(206 if rng else 200)
         self.send_header("Content-Type", ctype)
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(length))
         if rng:
