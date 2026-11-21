@@ -84,7 +84,7 @@ A folder path means "move there". `""` means "leave them where they are". `"TRAS
 
 ## Good to know
 
-- **iCloud:** files that live only in iCloud ("Optimize Mac Storage") show "only in iCloud" instead of a thumbnail, because making one would download them. To see them, Control-click the folder in Finder and choose **Keep Downloaded** (it downloads everything inside, so check the folder's size and your free space first), then run `make_sheet.py` again. Moving files on the same disk is a rename, so files only in iCloud can be moved without downloading them. If your Desktop and Documents sync to iCloud, whatever you move or trash there changes on your other devices too.
+- **iCloud:** files that live only in iCloud ("Optimize Mac Storage") show "only in iCloud" instead of a thumbnail, because making one would download them. To see them, Control-click the folder in Finder and choose **Keep Downloaded** (it downloads everything inside, so check the folder's size and your free space first), then run `make_sheet.py` again. Moving files on the same disk is a rename, so files only in iCloud can be moved without downloading them. If your Desktop and Documents sync to iCloud, whatever you move or trash there changes on your other devices too. The `trash` command can refuse files in iCloud Drive; `apply.py --go` then says how many stayed where they are, and you drag those to the Trash in Finder.
 - **Big folders:** making the sheet for 4,784 files took under two minutes on my Mac. Thumbnails are reused when you run it again.
 - **Only images and videos.** PDFs, zips and installers are a job for another day.
 

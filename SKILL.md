@@ -54,7 +54,7 @@ This writes `data/<sheet>/plan.json` and prints, for each bucket, how many files
 
 - a folder path: move there;
 - `""`: leave those files where they are;
-- `"TRASH"`: to the Trash. Write this only for a bucket they have named for the Trash in this conversation.
+- `"TRASH"`: to the Trash. Write this only for a bucket they have named for the Trash in this conversation. If `--go` reports files the Trash refused (common in iCloud Drive), tell them which, and that Finder can trash them.
 
 ## 5. Move, only at their yes
 

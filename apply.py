@@ -99,6 +99,7 @@ def go(sheet):
     trash = shutil.which("trash")
     log = os.path.join(d, time.strftime("moves-%Y%m%d-%H%M%S.tsv"))
     moved = trashed = missing = skipped = 0
+    refused = []
     with open(log, "w", encoding="utf-8") as fh:
         for it in sheet_data["items"]:
             c = choices.get(it["id"]) or {}
@@ -113,9 +114,11 @@ def go(sheet):
                 if not trash:
                     skipped += 1
                     continue
-                if subprocess.run([trash, src], capture_output=True).returncode == 0:
+                if subprocess.run([trash, src], capture_output=True).returncode == 0 and not os.path.lexists(src):
                     fh.write(f"trash\t{src}\t\n"); fh.flush()
                     trashed += 1
+                else:
+                    refused.append(src)
                 continue
             folder = os.path.expanduser(t)
             if subfolders and c.get("n", "").strip():
@@ -130,6 +133,9 @@ def go(sheet):
             moved += 1
     write_json(os.path.join(d, "items.json"), sheet_data)  # the sheet follows the files
     print(f"Moved {moved}, to the Trash {trashed}, already gone {missing}.")
+    if refused:
+        print(f"{files(len(refused))} marked TRASH stayed where they are: the Trash refused them, e.g. {refused[0]}")
+        print("Files in iCloud Drive (an iCloud-synced Desktop or Documents) can refuse it: drag them to the Trash in Finder.")
     if not moved and not trashed:
         os.remove(log)  # the empty log this run just opened
         return
